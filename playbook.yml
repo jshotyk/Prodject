@@ -1,0 +1,87 @@
+- hosts: node1
+  become: yes
+
+  tasks:
+    - name: Install epel-release repository
+      yum:
+        name: epel-release
+        state: present
+
+    - name: Install dependencies
+      yum:
+        name: [wget, tar, git]
+        state: present
+
+    - name: Download shadowsocks-rust archive
+      get_url:
+        url: "https://github.com/shadowsocks/shadowsocks-rust/releases/download/v1.15.3/shadowsocks-v1.15.3.x86_64-unknown-linux-gnu.tar.xz"
+        dest: "/tmp/shadowsocks.tar.xz"
+        mode: 0644
+           
+    - name: Extract shadowsocks-rust archive
+      unarchive:
+        src: "/tmp/shadowsocks.tar.xz"
+        dest: "/bin"
+        remote_src: yes
+        creates: /bin/ssserver
+
+    - name: Download V2Ray plugin
+      get_url:
+        url: "https://github.com/shadowsocks/v2ray-plugin/releases/download/v1.3.2/v2ray-plugin-linux-amd64-v1.3.2.tar.gz"
+        dest: "/tmp/v2ray.tar.gz"
+        mode: 0644
+            
+    - name: Extract V2Ray archive
+      unarchive:
+         src: "/tmp/v2ray.tar.gz"
+         dest: "/bin"
+         remote_src: yes
+         extra_opts: [--transform=s|.*|v2ray-plugin|]
+         creates: /bin/v2ray-plugin
+
+
+    - name: Clone Shadowsocks-Rust repository
+      git:
+        repo: https://github.com/jshotyk/config_shadowsokc.git
+        dest: /tmp/shadowsocks-repo
+      
+    - name: Create Shadowsocks-Rust config directory
+      file:
+        path: /etc/shadowsocks
+        state: directory
+    
+    - name: Copy Shadowsocks-Rust config file
+      copy:
+        src: /tmp/shadowsocks-repo/config.json
+        dest: /etc/shadowsocks/config.json
+        remote_src: true
+
+    - name: Create ssserver systemd service
+      copy:
+       src: "/tmp/shadowsocks-repo/ssserver.service"
+       dest: "/etc/systemd/system/ssserver.service"
+       remote_src: true
+
+    - name: Reload systemd
+      systemd:
+        daemon_reload: yes
+
+    - name: Start ssserver
+      systemd:
+        name: ssserver
+        state: started
+        enabled: yes
+         
+    - name: Open port 443
+      firewalld:
+        port: 443/tcp
+        permanent: yes
+        state: enabled
+        immediate: yes
+
+    - name: Open port 80
+      firewalld:
+        port: 80/tcp
+        permanent: yes
+        state: enabled
+        immediate: yes
