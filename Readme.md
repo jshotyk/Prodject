@@ -1,33 +1,62 @@
-FROM alpine
+### Описание
 
-# Установка пакетов wget и tar
-RUN apk update && apk add --no-cache wget tar
+Данный плейбук направлен на установку и настройку Shadowsocks-Rust на удаленном хосте `node1`. Shadowsocks-Rust - это прокси-сервер, который обеспечивает приватность и безопасность при передаче данных через Интернет. В процессе выполнения плейбука происходит установка необходимых зависимостей, загрузка архивов Shadowsocks-Rust и V2Ray Plugin, извлечение их содержимого, клонирование репозитория Shadowsocks-Rust и настройка конфигурационного файла.
 
-# Создание пользователя doby
-RUN adduser -D -u 1000 doby
+#### Задачи плейбука
 
-# Установка Shadowsocks и V2Ray
-RUN wget -O /tmp/shadowsocks.tar.xz "https://github.com/shadowsocks/shadowsocks-rust/releases/download/v1.15.3/shadowsocks-v1.15.3.x86_64-unknown-linux-gnu.tar.xz" \
-    && tar -xf /tmp/shadowsocks.tar.xz -C /bin --strip-components=1 \
-    && wget -O /tmp/v2ray.tar.gz "https://github.com/shadowsocks/v2ray-plugin/releases/download/v1.3.2/v2ray-plugin-linux-amd64-v1.3.2.tar.gz" \
-    && tar -xf /tmp/v2ray.tar.gz -C /bin --strip-components=1 --transform 's|.*/|v2ray-plugin/|'
+1. **Установка репозитория epel-release**: Устанавливает репозиторий epel-release, который содержит дополнительные пакеты для CentOS/RHEL.
 
-# Удаление загруженных архивов
-RUN rm /tmp/shadowsocks.tar.xz /tmp/v2ray.tar.gz
+2. **Установка зависимостей**: Устанавливает пакеты `wget`, `tar` и `git`, необходимые для последующих действий.
 
-# Установка прав доступа
-RUN chmod +x /bin/ssserver /bin/v2ray-plugin
+3. **Загрузка архива Shadowsocks-Rust**: Скачивает архив Shadowsocks-Rust с официального репозитория.
 
-USER doby
+4. **Извлечение архива Shadowsocks-Rust**: Извлекает содержимое архива Shadowsocks-Rust в директорию `/bin`, создавая исполняемый файл `ssserver`.
 
-CMD ["/bin/ssserver", "-c", "/etc/shadowsocks/config.json"]
+5. **Загрузка V2Ray Plugin**: Скачивает архив V2Ray Plugin для Shadowsocks-Rust.
 
-FROM alpine:latest
+6. **Извлечение архива V2Ray Plugin**: Извлекает содержимое архива V2Ray Plugin в директорию `/bin`, создавая исполняемый файл `v2ray-plugin`.
 
-RUN apk --no-cache add curl wget
+7. **Клонирование репозитория Shadowsocks-Rust**: Клонирует репозиторий Shadowsocks-Rust для получения дополнительных файлов и настроек.
 
-# Проверка доступности хоста и загрузка файла с использованием curl
-RUN curl -I https://github.com/shadowsocks/shadowsocks-rust/releases/download/v1.15.3/shadowsocks-v1.15.3.x86_64-unknown-linux-gnu.tar.xz
+8. **Создание директории конфигурации Shadowsocks-Rust**: Создает директорию `/etc/shadowsocks` для хранения конфигурационного файла Shadowsocks-Rust.
 
-# Проверка доступности хоста и загрузка файла с использованием wget
-RUN wget hhttps://github.com/shadowsocks/shadowsocks-rust/releases/download/v1.15.3/shadowsocks-v1.15.3.x86_64-unknown-linux-gnu.tar.xz
+9. **Копирование конфигурационного файла Shadowsocks-Rust**: Копирует предварительно подготовленный конфигурационный файл `config.json` из репозитория Shadowsocks-Rust в директорию `/etc/shadowsocks/config.json` на удаленном хосте.
+
+10. **Запрос на изменение IP-адреса**: Запрашивает новый IP-адрес для Shadowsocks-Rust с помощью паузы (pause). Введенный IP-адрес сохраняется в переменной `ip_change`.
+
+11. **Обновление конфигурационного файла Shadowsocks-Rust с новым IP-адресом**: Обновляет конфигурационный файл Shadowsocks-Rust, заменяя текущий IP-адрес на новый, введенный пользователем. Для этого используется модуль `lineinfile`.
+
+12. **Запрос на изменение пароля**: Запрашивает новый пароль для Shadowsocks-Rust с помощью паузы (pause). Введенный пароль сохраняется в переменной `password_change`.
+
+13. **Обновление конфигурационного файла Shadowsocks-Rust с новым паролем**: Обновляет конфигурационный файл Shadowsocks-Rust, заменяя текущий пароль на новый, введенный пользователем. Для этого также используется модуль `lineinfile`.
+
+14. **Создание systemd-сервиса для ssserver**: Копирует файл сервиса `ssserver.service` из репозитория Shadowsocks-Rust в директорию `/etc/systemd/system/`. Этот файл определяет настройки и параметры запуска для ssserver.
+
+15. **Перезагрузка systemd**: Перезагружает systemd для применения изменений и загрузки нового сервиса ssserver.
+
+16. **Запуск ssserver**: Запускает ssserver, используя systemd, и устанавливает его в качестве автозапуска.
+
+17. **Открытие порта 443**: Открывает порт 443 в брандмауэре firewalld для разрешения входящих соединений по протоколу TCP.
+
+18. **Открытие порта 80**: Открывает порт 80 в брандмауэре firewalld для разрешения входящих соединений по протоколу TCP.
+
+### Использование
+
+1. Установите Ansible на вашу управляющую машину.
+
+2. Укажите необходимые настройки инвентаря и аутентификации в файле `ansible.cfg`.
+
+3. Замените значение `node1` в секции `hosts` на адрес вашего удаленного хоста, на котором планируется установить Shadowsocks-Rust.
+
+4. Запустите плейбук командой:
+
+   ```shell
+   ansible-playbook playbook.yml
+   ```
+
+   При необходимости, введите пароль sudo для получения привилегий на удаленном хосте.
+
+5. Следуйте указаниям во время выполнения плейбука для ввода нового IP-адреса и пароля для Shadowsocks-Rust.
+
+6. После успешного выполнения плейбука, Shadowsocks-Rust будет установлен и настроен на удаленном хосте.
+
