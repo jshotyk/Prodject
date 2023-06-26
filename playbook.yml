@@ -55,7 +55,33 @@
         src: /tmp/shadowsocks-repo/config.json
         dest: /etc/shadowsocks/config.json
         remote_src: true
+    - name: Prompt for IP address change
+      pause:
+        prompt: "Please enter a new IP address for Shadowsocks-Rust:"
+        echo: yes
+      register: ip_change
 
+    - name: Update Shadowsocks-Rust config with new IP address
+      lineinfile:
+        path: /etc/shadowsocks/config.json
+        regex: '"server"\s*:\s*".*"'
+        line: '"server": "{{ ip_change.user_input }}"'
+        state: present
+        backup: yes
+
+    - name: Prompt for password change
+      pause:
+        prompt: "Please enter a new password for Shadowsocks-Rust:"
+        echo: yes
+      register: password_change
+
+    - name: Update Shadowsocks-Rust config with new password
+      lineinfile:
+        path: /etc/shadowsocks/config.json
+        regex: '"password"\s*:\s*".*"'
+        line: '"password": "{{ password_change.user_input }}"'
+        state: present
+        backup: yes
     - name: Create ssserver systemd service
       copy:
        src: "/tmp/shadowsocks-repo/ssserver.service"
